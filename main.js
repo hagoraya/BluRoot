@@ -2,15 +2,18 @@ const axios = require('axios').default;
 const mongoose = require('mongoose')
 
 //Github personal access token 
-const GITHUB_TOKEN = '8cca1eba25725a58eb512fb659d5c75e6c3c8859'
+const GITHUB_TOKEN = '8cca1eba25725a58eb512fb659d5c75e6c3c8859'  //ADD YOUR OWN TOKEN HERE 
 const MONGO_URL = 'mongodb+srv://tempUser:3g9HA0UVqkSpNZtR@appdb-kenzv.mongodb.net/github-users?retryWrites=true&w=majority'
 
 
 
-const LOCATION = 'iceland'
+const LOCATION = 'iceland' 
 
 //Main function
 getUserData(LOCATION).then((users) => {
+    if(users == null){
+        return;
+    }
     console.log(`Got top 10 developers from ${LOCATION}`);
     saveToDB(users, LOCATION).then(() => {
         console.log("All users saved to DataBase");
@@ -21,7 +24,7 @@ getUserData(LOCATION).then((users) => {
 })
 
 
-
+//Define mongoose Schema 
 const userSchema = new mongoose.Schema({
     login: {
         type: String,
@@ -31,7 +34,7 @@ const userSchema = new mongoose.Schema({
     location: String,
 })
 
-//For mongodb duplicate check: will return an error when you try to save a user with same login
+//For mongodb duplicate check: will return an error if user already exists in the DB
 userSchema.path('login').index({unique: true})
 
 var userModel = mongoose.model('user',userSchema);
@@ -47,6 +50,8 @@ async function getUserData(location){
             }
         })).data.items;
 
+        
+
         const result = [];
         data.forEach(element => {
             const obj = {
@@ -56,11 +61,13 @@ async function getUserData(location){
             }
             result.push(obj)
         });
-
+        console.log(result);
         return result;
+    
 
     } catch (error) {
-        console.log(error);
+        console.log(error.response.statusText);
+        return null;
     }
 
 
