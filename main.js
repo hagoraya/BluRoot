@@ -1,18 +1,25 @@
 const axios = require('axios').default;
-const { Db } = require('mongodb');
 const mongoose = require('mongoose')
 
-const LOCATION = 'toronto'
 const GITHUB_TOKEN = '8cca1eba25725a58eb512fb659d5c75e6c3c8859'
 const MONGO_URL = 'mongodb+srv://tempUser:3g9HA0UVqkSpNZtR@appdb-kenzv.mongodb.net/github-users?retryWrites=true&w=majority'
 
+
+
 const userSchema = new mongoose.Schema({
-    name: String,
+    login: {
+        type: String,
+        unique: true,
+    },
     html_url: String,
     location: String,
 })
 
+//To check if duplicates exists
+userSchema.path('login').index({unique: true})
+
 var userModel = mongoose.model('user',userSchema);
+
 
 
 async function getUserData(location){
@@ -46,21 +53,66 @@ async function getUserData(location){
 
 
 async function saveToDB(data, location){
-    mongoose.connect(MONGO_URL, {useNewUrlParser: true, useUnifiedTopology: true});
-    const DB = mongoose.connection;
-    DB.on('error', console.error.bind(console, 'Database connection error:'))
-    DB.once('open', function(){
-        //Connected to MongoDB 
-        
+
+    var promises = []
+    var counter = 0
+
+    //Establish a DB connected
+    mongoose.connect(MONGO_URL, 
+        {
+        useNewUrlParser: true, 
+        useUnifiedTopology: true, 
+        useCreateIndex: true
+        }
+    ).then(() => {
+        console.log("Connected To DB");
+
+        data.map((user) => {
+
+            //Create a new User
+             var newUser = new userModel({
+                 login: user.login,
+                 html_url: user.html_url,
+                 location: location,
+             });
+
+ 
+             newUser.save()
+             .then(() => { 
+                 //User successfully saved
+                counter++;
+                
+                //Close DB connection if all users have been processed
+                 if(counter == data.length){
+                    mongoose.connection.close();
+                 }
+             })
+             .catch((err) => {
+                 //The user already exists or there was an error
+                counter++;
+                
+                //Close DB connection if all users have been processed
+                if(counter == data.length){
+                    mongoose.connection.close();
+                }   
+             });
+        });
+    }).catch((err) => {
+        console.log('Error connecting to DB ' + err);
     })
-    
-
-
 }
 
 
-getUserData(LOCATION).then((data) => {
-    console.log(data);
-    //store users in DB 
-    saveToDB(data, LOCATION)
+
+const LOCATION = 'brazil'
+
+getUserData(LOCATION).then((users) => {
+    console.log(`Got top 10 developers from ${LOCATION}`);
+
+    saveToDB(users, LOCATION).then(() => {
+        console.log("All users saved to DataBase");
+    }).catch((err) => {
+        console.log(err);
+    })
+
 })
